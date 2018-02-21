@@ -43,6 +43,15 @@ class Actor {
         this.inMotion = inMotion;
         this.color = color;
     }
+
+    intersects (actor) {
+        const a = this;
+        const b = actor;
+        const distanceThreshold = (a.size + b.size) / 2;
+        const distance = Math.sqrt(Math.pow(b.position.x - a.position.x, 2) + Math.pow(b.position.y - a.position.y, 2));
+
+        return distance < distanceThreshold;
+    }
 }
 
 class ActorShape extends createjs.Shape {
@@ -51,7 +60,7 @@ class ActorShape extends createjs.Shape {
 
         this.actor = actor;
         
-        this.graphics.beginFill(actor.color).drawCircle(0, 0, actor.size);
+        this.graphics.beginFill(actor.color).drawCircle(0, 0, actor.size / 2);
 
         actor.position.watch((x, y) => {
             this.x = x;
@@ -73,20 +82,28 @@ class GaussianWalk {
 
         this.actors = [];
 
-        setInterval(this.advance.bind(this), 1);
+        this.advance();
 
         createjs.Ticker.on("tick", this.tick.bind(this));
     }
 
     addActor ({ inMotion = true, size = 10 }) {
         const actor = new Actor({inMotion, color: this.color, size});
-        actor.position.x = Math.random() * this.stage.canvas.width;
-        actor.position.y = Math.random() * this.stage.canvas.height;
+        this.resetActor(actor);
         this.actors.push(actor);
 
         const shape = new ActorShape(actor);
         this.stage.addChild(shape);
         this.stage.update();
+    }
+
+    resetActors () {
+        this.actors.forEach(actor => this.resetActor(actor));
+    }
+
+    resetActor (actor) {
+        actor.position.x = Math.random() * this.stage.canvas.width;
+        actor.position.y = Math.random() * this.stage.canvas.height;
     }
 
     advance () {
@@ -124,10 +141,7 @@ class GaussianWalk {
             let intersects;
 
             GaussianWalk.eachCombination(this.actors, (a, b) => {
-                const distanceThreshold = (a.size + b.size) / 2;
-                const distance = Math.sqrt(Math.pow(b.x - a.x, 2) + Math.pow(b.y - a.y, 2));
-
-                if (distance < distanceThreshold) {
+                if (a.intersects(b)) {
                     intersects = true;
 
                     return false;
@@ -135,8 +149,11 @@ class GaussianWalk {
             });
 
             if (intersects)
-                this.onIntersect();
+                this.onIntersect(this);
         }
+        
+        // wait until this is done before moving again
+        setTimeout(this.advance.bind(this), 1);
     }
 
     tick () {
@@ -211,6 +228,12 @@ class Table extends createjs.Container {
     }
 }
 
+class Intersection {
+    constructor () {
+        this.time = new Date();
+    }
+}
+
 class GaussianWalkAnalysis {
     constructor (canvas) {
         this.startTime = new Date();
@@ -218,33 +241,35 @@ class GaussianWalkAnalysis {
         this.walks = [];
         this.stage = new createjs.Stage(canvas);
         
-        this.intersections = [];
+        this.motionIntersections = [];
 
-        const actorSize = 100;
+        const actorSize = 400;
 
         this.motionWalk = new GaussianWalk({
             stage: this.stage,
             color: 'DeepSkyBlue',
-            onIntersect: () => {
-                this.intersections[0]++;
+            onIntersect: (walk, actor) => {
+                this.motionIntersections.push(new Intersection());
+                walk.resetActors();
             }
         });
         this.motionWalk.addActor({ inMotion: true, size: actorSize });
         this.motionWalk.addActor({ inMotion: true, size: actorSize });
         this.walks.push(this.motionWalk);
-        this.intersections.push(0);
+
+        this.staticIntersections = [];
         
         this.staticWalk = new GaussianWalk({
             stage: this.stage,
             color: 'Red',
-            onIntersect: () => {
-                this.intersections[1]++;
+            onIntersect: (walk, actor) => {
+                this.staticIntersections.push(new Intersection());
+                walk.resetActors();
             }
         });
         this.staticWalk.addActor({ inMotion: false, size: actorSize });
         this.staticWalk.addActor({ inMotion: true, size: actorSize });
         this.walks.push(this.staticWalk);
-        this.intersections.push(0);
 
         this.table = new Table({ data: this.getData(), width: 200, height: 200, cellPadding: 4 });
         this.stage.addChild(this.table);
@@ -254,15 +279,48 @@ class GaussianWalkAnalysis {
 
     getData () {
         const elapsedTime = ((new Date().getTime() - this.startTime.getTime()) / 1000);
+        const motionCount = this.motionIntersections.length;
+        const staticCount = this.staticIntersections.length;
+        let averageMotionTime, averageStaticTime, motionLast, staticLast, older;
+        
+        if (motionCount > 0) {
+            averageMotionTime = (this.motionIntersections[motionCount - 1].time.getTime() - this.startTime.getTime()) / 1000;
+
+            if (motionCount > 1)
+                older = this.motionIntersections[motionCount - 2].time;
+            else
+                older = this.startTime;
+
+            motionLast = (this.motionIntersections[motionCount - 1].time.getTime() - older.getTime()) / 1000;
+        } else {
+            averageMotionTime = '';
+            motionLast = '';
+        }
+        
+        if (staticCount > 0) {
+            averageStaticTime = (this.staticIntersections[staticCount - 1].time.getTime() - this.startTime.getTime()) / 1000;
+
+            if (staticCount > 1)
+                older = this.staticIntersections[staticCount - 2].time;
+            else
+                older = this.startTime;
+
+            staticLast = (this.staticIntersections[staticCount - 1].time.getTime() - older.getTime()) / 1000;
+        } else {
+            averageStaticTime = '';
+            staticLast = '';
+        }
 
         return [
             ['Intersections'],
             ['Elapsed Time:'],
             [elapsedTime + 's'],
-            ['Moving', 'Non-moving'],
-            [this.intersections[0], this.intersections[1]],
+            ['2 Movers', '1 Mover'],
+            [this.motionIntersections.length, this.staticIntersections.length],
             ['t/i'],
-            [elapsedTime / this.intersections[0], elapsedTime / this.intersections[1]]
+            [averageMotionTime + 's', averageStaticTime + 's'],
+            ['Last'],
+            [motionLast + 's', staticLast + 's']
         ];
     }
 

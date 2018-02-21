@@ -37,8 +37,9 @@ class Position {
 }
 
 class Actor {
-    constructor () {
+    constructor (size = 10) {
         this.position = new Position();
+        this.size = size;
     }
 }
 
@@ -48,7 +49,7 @@ class ActorShape extends createjs.Shape {
 
         this.actor = actor;
         
-        this.graphics.beginFill("DeepSkyBlue").drawCircle(0, 0, 50);
+        this.graphics.beginFill("DeepSkyBlue").drawCircle(0, 0, actor.size);
 
         actor.position.watch((x, y) => {
             this.x = x;
@@ -64,6 +65,8 @@ class GaussianWalk {
 
          for (let i = 0; i < actors; i++)
             this.addActor();
+
+        createjs.Ticker.on("tick", this.tick.bind(this));
     }
 
     addActor () {
@@ -74,6 +77,22 @@ class GaussianWalk {
 
         const shape = new ActorShape(actor);
         this.stage.addChild(shape);
+        this.stage.update();
+    }
+
+    tick () {
+        for (var i = 0; i < this.actors.length; i++) {
+            var actor = this.actors[i];
+
+            var angle = Math.random() * 2 * Math.PI;
+
+            var xDelta = Math.cos(angle);
+            var yDelta = Math.sin(angle);
+
+            actor.position.x += xDelta;
+            actor.position.y += yDelta;
+        }
+
         this.stage.update();
     }
 }

@@ -63,8 +63,10 @@ class GaussianWalk {
          this.stage = new createjs.Stage(canvas);
          this.actors = [];
 
-         for (let i = 0; i < actors; i++)
+        for (let i = 0; i < actors; i++)
             this.addActor();
+
+        setInterval(this.advance.bind(this), 1);
 
         createjs.Ticker.on("tick", this.tick.bind(this));
     }
@@ -80,7 +82,7 @@ class GaussianWalk {
         this.stage.update();
     }
 
-    tick () {
+    advance () {
         for (var i = 0; i < this.actors.length; i++) {
             var actor = this.actors[i];
 
@@ -89,10 +91,27 @@ class GaussianWalk {
             var xDelta = Math.cos(angle);
             var yDelta = Math.sin(angle);
 
-            actor.position.x += xDelta;
-            actor.position.y += yDelta;
-        }
+            var newX = actor.position.x + xDelta;
 
+            if (newX < 0)
+                newX = 0;
+            else if (newX > this.stage.canvas.width)
+                newX = this.stage.canvas.width;
+
+            actor.position.x = newX;
+
+            var newY = actor.position.y + yDelta;
+
+            if (newY < 0)
+                newY = 0;
+            else if (newY > this.stage.canvas.height)
+                newY = this.stage.canvas.height;
+
+            actor.position.y = newY;
+        }
+    }
+
+    tick () {
         this.stage.update();
     }
 }

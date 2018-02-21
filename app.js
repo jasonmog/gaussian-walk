@@ -37,9 +37,11 @@ class Position {
 }
 
 class Actor {
-    constructor (size = 10) {
+    constructor ({size = 10, inMotion = true, color = 'Black'}) {
         this.position = new Position();
         this.size = size;
+        this.inMotion = inMotion;
+        this.color = color;
     }
 }
 
@@ -49,7 +51,7 @@ class ActorShape extends createjs.Shape {
 
         this.actor = actor;
         
-        this.graphics.beginFill("DeepSkyBlue").drawCircle(0, 0, actor.size);
+        this.graphics.beginFill(actor.color).drawCircle(0, 0, actor.size);
 
         actor.position.watch((x, y) => {
             this.x = x;
@@ -59,20 +61,23 @@ class ActorShape extends createjs.Shape {
 }
 
 class GaussianWalk {
-    constructor (canvas, actors = 2) {
-         this.stage = new createjs.Stage(canvas);
-         this.actors = [];
+    constructor ({ stage, color = 'Black' }) {
+        if (stage instanceof createjs.Stage)
+            this.stage = stage;
+        else
+            this.stage = new createjs.Stage(stage);
 
-        for (let i = 0; i < actors; i++)
-            this.addActor();
+        this.color = color;
+
+        this.actors = [];
 
         setInterval(this.advance.bind(this), 1);
 
         createjs.Ticker.on("tick", this.tick.bind(this));
     }
 
-    addActor () {
-        const actor = new Actor();
+    addActor (inMotion = true) {
+        const actor = new Actor({inMotion, color: this.color});
         actor.position.x = Math.random() * this.stage.canvas.width;
         actor.position.y = Math.random() * this.stage.canvas.height;
         this.actors.push(actor);
@@ -83,15 +88,18 @@ class GaussianWalk {
     }
 
     advance () {
-        for (var i = 0; i < this.actors.length; i++) {
-            var actor = this.actors[i];
+        for (let i = 0; i < this.actors.length; i++) {
+            const actor = this.actors[i];
 
-            var angle = Math.random() * 2 * Math.PI;
+            if (!actor.inMotion)
+                continue;
 
-            var xDelta = Math.cos(angle);
-            var yDelta = Math.sin(angle);
+            const angle = Math.random() * 2 * Math.PI;
 
-            var newX = actor.position.x + xDelta;
+            const xDelta = Math.cos(angle);
+            const yDelta = Math.sin(angle);
+
+            let newX = actor.position.x + xDelta;
 
             if (newX < 0)
                 newX = 0;
@@ -100,7 +108,7 @@ class GaussianWalk {
 
             actor.position.x = newX;
 
-            var newY = actor.position.y + yDelta;
+            let newY = actor.position.y + yDelta;
 
             if (newY < 0)
                 newY = 0;
@@ -116,6 +124,23 @@ class GaussianWalk {
     }
 }
 
+class GaussianWalkAnalysis {
+    constructor (canvas) {
+        this.walks = [];
+        this.stage = new createjs.Stage(canvas);
+        
+        this.motionWalk = new GaussianWalk({ stage: this.stage, color: 'DeepSkyBlue' });
+        this.motionWalk.addActor(true);
+        this.motionWalk.addActor(true);
+        this.walks.push(this.motionWalk);
+        
+        this.staticWalk = new GaussianWalk({ stage: this.stage, color: 'Red' });
+        this.staticWalk.addActor(false);
+        this.staticWalk.addActor(true);
+        this.walks.push(this.staticWalk);
+    }
+}
+
 function init () {
     const canvas = document.createElement('canvas');
     canvas.width = document.documentElement.clientWidth;
@@ -125,5 +150,5 @@ function init () {
     canvas.style.top = 0;
     document.getElementsByTagName('body')[0].appendChild(canvas);
 
-    new GaussianWalk(canvas);
+    const analysis = new GaussianWalkAnalysis(canvas);
 }

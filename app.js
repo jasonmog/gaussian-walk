@@ -104,6 +104,17 @@ class GaussianWalk {
     resetActor (actor) {
         actor.position.x = Math.random() * this.stage.canvas.width;
         actor.position.y = Math.random() * this.stage.canvas.height;
+
+        for (let a of this.actors) {
+            if (actor === a)
+                return;
+
+            if (a.intersects(actor)) {
+                this.resetActor(actor);
+
+                break;
+            }
+        }
     }
 
     advance () {
@@ -278,13 +289,15 @@ class GaussianWalkAnalysis {
     }
 
     getData () {
-        const elapsedTime = ((new Date().getTime() - this.startTime.getTime()) / 1000);
+        const elapsedTime = ((new Date().getTime() - this.startTime.getTime()) / 1000) + 's';
         const motionCount = this.motionIntersections.length;
         const staticCount = this.staticIntersections.length;
         let averageMotionTime, averageStaticTime, motionLast, staticLast, older;
         
         if (motionCount > 0) {
             averageMotionTime = (this.motionIntersections[motionCount - 1].time.getTime() - this.startTime.getTime()) / 1000;
+            averageMotionTime /= motionCount;
+            averageMotionTime += 's';
 
             if (motionCount > 1)
                 older = this.motionIntersections[motionCount - 2].time;
@@ -292,6 +305,7 @@ class GaussianWalkAnalysis {
                 older = this.startTime;
 
             motionLast = (this.motionIntersections[motionCount - 1].time.getTime() - older.getTime()) / 1000;
+            motionLast += 's';
         } else {
             averageMotionTime = '';
             motionLast = '';
@@ -299,6 +313,8 @@ class GaussianWalkAnalysis {
         
         if (staticCount > 0) {
             averageStaticTime = (this.staticIntersections[staticCount - 1].time.getTime() - this.startTime.getTime()) / 1000;
+            averageStaticTime /= staticCount;
+            averageStaticTime += 's';
 
             if (staticCount > 1)
                 older = this.staticIntersections[staticCount - 2].time;
@@ -306,6 +322,7 @@ class GaussianWalkAnalysis {
                 older = this.startTime;
 
             staticLast = (this.staticIntersections[staticCount - 1].time.getTime() - older.getTime()) / 1000;
+            staticLast += 's';
         } else {
             averageStaticTime = '';
             staticLast = '';
@@ -314,13 +331,13 @@ class GaussianWalkAnalysis {
         return [
             ['Intersections'],
             ['Elapsed Time:'],
-            [elapsedTime + 's'],
+            [elapsedTime],
             ['2 Movers', '1 Mover'],
             [this.motionIntersections.length, this.staticIntersections.length],
-            ['t/i'],
-            [averageMotionTime + 's', averageStaticTime + 's'],
+            ['Average'],
+            [averageMotionTime, averageStaticTime],
             ['Last'],
-            [motionLast + 's', staticLast + 's']
+            [motionLast, staticLast]
         ];
     }
 
